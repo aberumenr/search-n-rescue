@@ -7,8 +7,27 @@ import matplotlib.pyplot as plt
 pygame.init()
 
 # config
+
+GRID_COLS = 24
+GRID_ROWS = 16
+CELL_SIZE = 48
+
+GRID_WIDTH = GRID_COLS * CELL_SIZE
+GRID_HEIGHT = GRID_ROWS * CELL_SIZE
+
+PANEL_WIDTH = 360
+
+WIDTH = GRID_WIDTH + PANEL_WIDTH
+HEIGHT = GRID_HEIGHT
+
+screen = pygame.display.set_mode(
+    (WIDTH, HEIGHT)
+)
+
+WORLD_RECT = pygame.Rect(0, 0, GRID_WIDTH, GRID_HEIGHT)
+PANEL_RECT = pygame.Rect(GRID_WIDTH, 0, PANEL_WIDTH, HEIGHT)
+
 GRID_SIZE = 20
-CELL_SIZE = 32
 
 POP_SIZE = 16
 EVALUATION_RUNS = 5
@@ -17,35 +36,101 @@ FINAL_VALIDATION_RUNS = 30
 
 GENERATIONS = 30
 
-GRID_WIDTH = GRID_SIZE * CELL_SIZE
-GRID_HEIGHT = GRID_SIZE * CELL_SIZE
+sarge_image = pygame.image.load("sargeant.png").convert_alpha()
+victim_image = pygame.image.load("victim.png").convert_alpha()
 
-WIDTH = GRID_WIDTH
-HEIGHT = GRID_HEIGHT
+fullscreen = False
 
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Search & Rescue")
+pygame.display.set_caption("SAR-GEANT")
 
 clock = pygame.time.Clock()
 
 # colors
 
-BACKGROUND = (10, 15, 25)
-CELL_COLOR = (30, 35, 45)
-GRID_COLOR = (55, 65, 80)
+BACKGROUND = (225, 232, 242)
 
-OBSTACLE_COLOR = (90, 90, 100)
-DOG_COLOR = (60, 150, 220)
-VICTIM_COLOR = (190, 55, 65)
+SNOW_COLOR = (239, 245, 250)
+GRID_COLOR = (211, 222, 233)
 
-TEXT_COLOR = (245, 245, 245)
+SNOW_DOT_1 = (230, 237, 244)
+SNOW_DOT_2 = (226, 234, 242)
+SNOW_DRIFT = (245, 248, 252, 80)
+
+SUCCESS_COLOR = (217, 108, 72)
+
+VICTIM_HEAD = (233, 205, 182)
+VICTIM_COAT = (88, 109, 152)
+VICTIM_SCARF = (235, 177, 92)
+VICTIM_OUTLINE = (57, 70, 98)
+
+PANEL_COLOR = (34, 43, 56)
+PANEL_SECTION_COLOR = (44, 55, 70)
+
+TEXT_DARK = (22, 28, 36)
+TEXT_LIGHT = (245, 248, 252)
+TEXT_MUTED = (190, 200, 212)
+
+ACCENT_BLUE = (111, 168, 220)
+ACCENT_CYAN = (130, 210, 235)
+ACCENT_RED = (210, 78, 78)
+ACCENT_GREEN = (83, 176, 118)
+ACCENT_ORANGE = (218, 140, 74)
+
+OBSTACLE_COLOR = (120, 130, 142)
+OBSTACLE_SHADOW = (95, 105, 118)
+
+DOG_COLOR = (152, 94, 62)
+DOG_OUTLINE = (72, 44, 28)
+VEST_COLOR = (189, 42, 42)
+
+VICTIM_COLOR = (200, 62, 62)
+FOOTPRINT_COLOR = (150, 160, 176)
+
+DOG_CREAM = (232, 229, 204)
+DOG_BROWN = (134, 92, 66)
+DOG_DARK = (72, 54, 50)
+DOG_NOSE = (45, 35, 35)
+DOG_VEST = (182, 54, 54)
+DOG_SHADOW = (180, 184, 192)
+
+SARGE_SPRITE = [
+    "........................",
+    "..............oooo......",
+    ".............obbbbo.....",
+    "............obwbbbeo....",
+    "...........obwwwbbno....",
+    "...........obcwcccbo....",
+    "......ooooobcccvvvbo....",
+    "...ooobbbbbccccvvvvbo...",
+    "..obbbbbbbcccccvvvvbo...",
+    ".obbbccccccccccccccbo...",
+    ".obccccccccccccccccbo...",
+    "obccccccccccccccccccbo..",
+    "obccccccccccccccccccbo..",
+    ".obcccccoovvvvooccoo....",
+    "..obccoo..ovvvo..occo...",
+    "...obco...occo...occo...",
+    "...oooo...oooo...oooo...",
+    "........................",
+    "........................"
+]
+
+SARGE_PALETTE = {
+    "o": (62, 45, 39),      # dark outline
+    "c": (238, 231, 205),   # cream fur
+    "w": (250, 246, 225),   # white blaze
+    "b": (139, 86, 55),     # brown markings
+    "v": (181, 49, 52),     # rescue vest
+    "e": (46, 35, 32),      # eye
+    "n": (38, 30, 29)       # nose
+}
 
 # world
 
 START_POSITION = [1, 1]
 
 dog_pos = START_POSITION.copy()
-victim_pos = [17, 15]
+victim_pos = [19, 13]
 
 obstacles = {
     (5, 5), (5, 6), (5, 7), (5, 8),
@@ -78,10 +163,14 @@ best_evolved_chromosome = None
 rescued = False
 show_scent = False
 auto_mode = False
+show_controls = False
+
+dog_facing_right = True
 
 step_count = 0
 repeated_visits = 0
 run_finished = False
+show_grid = False
 
 MAX_STEPS = 200
 FAILURE_PENALTY = 500
@@ -89,14 +178,18 @@ FAILURE_PENALTY = 500
 last_auto_move = 0
 AUTO_DELAY = 150
 
+DOG_NAME = "Sargeant"
+
+trail_positions = []
+
 # basic map functions
 
 def valid_position(x, y):
 
-    if x < 0 or x >= GRID_SIZE:
+    if x < 0 or x >= GRID_COLS:
         return False
 
-    if y < 0 or y >= GRID_SIZE:
+    if y < 0 or y >= GRID_ROWS:
         return False
 
     if (x, y) in obstacles:
@@ -104,10 +197,10 @@ def valid_position(x, y):
 
     return True
 
-
 def record_visit(position):
 
     global repeated_visits
+    global trail_positions
 
     key = tuple(position)
 
@@ -116,8 +209,7 @@ def record_visit(position):
 
     visit_count[key] = visit_count.get(key, 0) + 1
 
-
-record_visit(dog_pos)
+    trail_positions.append(key)
 
 def manhattan_distance():
 
@@ -231,6 +323,7 @@ def autonomous_step():
     global dog_pos
     global step_count
     global run_finished
+    global dog_facing_right
 
     x, y = dog_pos
 
@@ -264,6 +357,12 @@ def autonomous_step():
 
     _, best_x, best_y = valid_candidates[0]
 
+    if best_x > dog_pos[0]:
+        dog_facing_right = True
+
+    elif best_x < dog_pos[0]:
+        dog_facing_right = False
+
     dog_pos = [best_x, best_y]
 
     step_count += 1
@@ -284,11 +383,18 @@ def move_dog(dx, dy):
     global dog_pos
     global step_count
     global run_finished
+    global dog_facing_right
 
     new_x = dog_pos[0] + dx
     new_y = dog_pos[1] + dy
 
     if valid_position(new_x, new_y):
+
+        if dx > 0:
+            dog_facing_right = True
+
+        elif dx < 0:
+            dog_facing_right = False
 
         dog_pos = [new_x, new_y]
 
@@ -314,13 +420,16 @@ def reset_simulation():
     global step_count
     global repeated_visits
     global run_finished
+    global trail_positions
 
     dog_pos = START_POSITION.copy()
 
     rescued = False
     auto_mode = False
+    dog_facing_right = True
 
     visit_count = {}
+    trail_positions = []
 
     step_count = 0
     repeated_visits = 0
@@ -1171,9 +1280,11 @@ def save_evolution_graphs(history):
 
 def draw_grid():
 
-    for row in range(GRID_SIZE):
+    if not show_grid:
+        return
 
-        for col in range(GRID_SIZE):
+    for row in range(GRID_ROWS):
+        for col in range(GRID_COLS):
 
             rect = pygame.Rect(
                 col * CELL_SIZE,
@@ -1184,17 +1295,66 @@ def draw_grid():
 
             pygame.draw.rect(
                 screen,
-                CELL_COLOR,
-                rect
-            )
-
-            pygame.draw.rect(
-                screen,
                 GRID_COLOR,
                 rect,
                 1
             )
 
+def draw_panel_divider():
+
+    pygame.draw.line(
+        screen,
+        (55, 65, 80),
+        (GRID_WIDTH, 0),
+        (GRID_WIDTH, HEIGHT),
+        2
+    )
+
+def draw_panel():
+
+    panel_rect = pygame.Rect(
+        GRID_WIDTH,
+        0,
+        PANEL_WIDTH,
+        HEIGHT
+    )
+
+    pygame.draw.rect(
+        screen,
+        PANEL_COLOR,
+        panel_rect
+    )
+
+def draw_panel_section(y, height, title):
+
+    section_rect = pygame.Rect(
+        GRID_WIDTH + 16,
+        y,
+        PANEL_WIDTH - 32,
+        height
+    )
+
+    pygame.draw.rect(
+        screen,
+        PANEL_SECTION_COLOR,
+        section_rect,
+        border_radius=10
+    )
+
+    title_font = pygame.font.SysFont(None, 28)
+
+    title_text = title_font.render(
+        title,
+        True,
+        TEXT_LIGHT
+    )
+
+    screen.blit(
+        title_text,
+        (GRID_WIDTH + 28, y + 12)
+    )
+
+    return section_rect
 
 def draw_scent_field():
 
@@ -1206,16 +1366,16 @@ def draw_scent_field():
         pygame.SRCALPHA
     )
 
-    for row in range(GRID_SIZE):
+    for row in range(GRID_ROWS):
 
-        for col in range(GRID_SIZE):
+        for col in range(GRID_COLS):
 
             strength = scent_strength(col, row)
 
             if strength <= 0:
                 continue
 
-            alpha = int(strength * 120)
+            alpha = int(strength * 85)
 
             rect = pygame.Rect(
                 col * CELL_SIZE,
@@ -1226,12 +1386,133 @@ def draw_scent_field():
 
             pygame.draw.rect(
                 overlay,
-                (70, 170, 255, alpha),
+                (120, 215, 255, alpha),
                 rect
             )
 
     screen.blit(overlay, (0, 0))
 
+def draw_pawprints():
+
+    if len(trail_positions) < 2:
+        return
+
+    max_steps = 24
+
+    # figure out where the visible trail begins
+    start_index = max(
+        0,
+        len(trail_positions) - max_steps
+    )
+
+    # don't draw underneath Sargeant
+    recent_positions = trail_positions[
+        start_index:-1
+    ]
+
+    if not recent_positions:
+        return
+
+    for actual_step, (x, y) in enumerate(
+        recent_positions,
+        start=start_index
+    ):
+
+        # age within the currently visible trail
+        age_index = (
+            actual_step - start_index
+        )
+
+        fade_ratio = (
+            (age_index + 1)
+            / len(recent_positions)
+        )
+
+        # old prints fade quickly
+        fade_ratio = fade_ratio ** 2
+
+        alpha = int(
+            8 + 120 * fade_ratio
+        )
+
+        color = (
+            FOOTPRINT_COLOR[0],
+            FOOTPRINT_COLOR[1],
+            FOOTPRINT_COLOR[2],
+            alpha
+        )
+
+        paw_surface = pygame.Surface(
+            (CELL_SIZE, CELL_SIZE),
+            pygame.SRCALPHA
+        )
+
+        # use ACTUAL step number
+        # so old prints never flip later
+        if actual_step % 2 == 0:
+
+            paws = [
+                (15, 16),
+                (31, 32)
+            ]
+
+        else:
+
+            paws = [
+                (31, 16),
+                (15, 32)
+            ]
+
+        for px, py in paws:
+
+            pygame.draw.ellipse(
+                paw_surface,
+                color,
+                (
+                    px - 4,
+                    py - 3,
+                    8,
+                    6
+                )
+            )
+
+            pygame.draw.circle(
+                paw_surface,
+                color,
+                (
+                    px - 3,
+                    py - 4
+                ),
+                1
+            )
+
+            pygame.draw.circle(
+                paw_surface,
+                color,
+                (
+                    px,
+                    py - 5
+                ),
+                1
+            )
+
+            pygame.draw.circle(
+                paw_surface,
+                color,
+                (
+                    px + 3,
+                    py - 4
+                ),
+                1
+            )
+
+        screen.blit(
+            paw_surface,
+            (
+                x * CELL_SIZE,
+                y * CELL_SIZE
+            )
+        )
 
 def draw_obstacles():
 
@@ -1244,102 +1525,283 @@ def draw_obstacles():
             CELL_SIZE
         )
 
+        inner_rect = pygame.Rect(
+            x * CELL_SIZE + 3,
+            y * CELL_SIZE + 4,
+            CELL_SIZE - 6,
+            CELL_SIZE - 8
+        )
+
+        pygame.draw.rect(
+            screen,
+            OBSTACLE_SHADOW,
+            rect,
+            border_radius=6
+        )
+
         pygame.draw.rect(
             screen,
             OBSTACLE_COLOR,
-            rect
+            inner_rect,
+            border_radius=6
         )
-
 
 def draw_victim():
 
     x, y = victim_pos
 
-    rect = pygame.Rect(
-        x * CELL_SIZE,
-        y * CELL_SIZE,
-        CELL_SIZE,
-        CELL_SIZE
+    cell_x = x * CELL_SIZE
+    cell_y = y * CELL_SIZE
+
+    draw_width = 44
+    draw_height = 44
+
+    scaled_victim = pygame.transform.scale(
+        victim_image,
+        (draw_width, draw_height)
     )
 
-    pygame.draw.rect(
-        screen,
-        VICTIM_COLOR,
-        rect
+    offset_x = (CELL_SIZE - draw_width) // 2
+    offset_y = (CELL_SIZE - draw_height) // 2
+
+    screen.blit(
+        scaled_victim,
+        (
+            cell_x + offset_x,
+            cell_y + offset_y
+        )
     )
 
+def draw_pixel_sprite(base_x, base_y, sprite, palette, pixel_size=2):
+
+    for row_index, row in enumerate(sprite):
+
+        for col_index, char in enumerate(row):
+
+            if char == ".":
+                continue
+
+            color = palette[char]
+
+            rect = pygame.Rect(
+                base_x + col_index * pixel_size,
+                base_y + row_index * pixel_size,
+                pixel_size,
+                pixel_size
+            )
+
+            pygame.draw.rect(
+                screen,
+                color,
+                rect
+            )
 
 def draw_dog():
 
     x, y = dog_pos
 
-    rect = pygame.Rect(
-        x * CELL_SIZE,
-        y * CELL_SIZE,
-        CELL_SIZE,
-        CELL_SIZE
+    cell_x = x * CELL_SIZE
+    cell_y = y * CELL_SIZE
+
+    draw_width = 58
+    draw_height = 58
+
+    scaled_sarge = pygame.transform.scale(
+        sarge_image,
+        (draw_width, draw_height)
     )
 
-    pygame.draw.rect(
-        screen,
-        DOG_COLOR,
-        rect
-    )
+    if not dog_facing_right:
+        scaled_sarge = pygame.transform.flip(
+            scaled_sarge,
+            True,
+            False
+        )
 
+    offset_x = (CELL_SIZE - draw_width) // 2
+    offset_y = (CELL_SIZE - draw_height) // 2
+
+    screen.blit(
+        scaled_sarge,
+        (
+            cell_x + offset_x,
+            cell_y + offset_y
+        )
+    )
 
 def draw_text():
 
-    font = pygame.font.SysFont(None, 26)
+    title_font = pygame.font.SysFont(None, 38)
+    subtitle_font = pygame.font.SysFont(None, 24)
+    body_font = pygame.font.SysFont(None, 24)
+    hint_font = pygame.font.SysFont(None, 22)
+    big_font = pygame.font.SysFont(None, 42)
 
-    instructions = (
-        "SPACE: step   A: auto   H: scent   "
-        "E: evaluate   P: population   "
-        "G: evolve   R: reset"
-    )
-
-    text = font.render(
-        instructions,
+    # header
+    title = title_font.render(
+        "Search & Rescue",
         True,
-        TEXT_COLOR
+        TEXT_LIGHT
     )
 
-    screen.blit(text, (12, HEIGHT - 28))
-
-    stats_font = pygame.font.SysFont(None, 24)
-
-    stats = (
-        f"Steps: {step_count}   "
-        f"Repeated: {repeated_visits}   "
-        f"Distance: {manhattan_distance()}   "
-        f"Cost: {calculate_cost():.1f}"
-    )
-
-    stats_text = stats_font.render(
-        stats,
+    subtitle = subtitle_font.render(
+        f"Dog: {DOG_NAME}",
         True,
-        TEXT_COLOR
+        TEXT_MUTED
     )
 
     screen.blit(
-        stats_text,
-        (12, 10)
+        title,
+        (GRID_WIDTH + 24, 18)
+    )
+
+    screen.blit(
+        subtitle,
+        (GRID_WIDTH + 24, 56)
+    )
+
+    # run status
+    draw_panel_section(
+        95,
+        205,
+        "Run Status"
+    )
+
+    mode_text = (
+        "Auto"
+        if auto_mode
+        else "Manual"
     )
 
     if rescued:
 
-        big_font = pygame.font.SysFont(
-            None,
-            48
+        status_text = "Rescue complete"
+        status_color = SUCCESS_COLOR
+
+    elif run_finished:
+
+        status_text = "Search failed"
+        status_color = ACCENT_RED
+
+    else:
+
+        status_text = "Searching"
+        status_color = ACCENT_CYAN
+
+    lines = [
+        ("Mode", mode_text),
+        ("Status", status_text),
+        ("Steps", str(step_count)),
+        ("Repeated", str(repeated_visits)),
+        ("Distance", str(manhattan_distance())),
+        ("Cost", f"{calculate_cost():.1f}")
+    ]
+
+    y = 138
+
+    for label, value in lines:
+
+        label_text = body_font.render(
+            f"{label}:",
+            True,
+            TEXT_MUTED
         )
+
+        value_text = body_font.render(
+            value,
+            True,
+            status_color
+            if label == "Status"
+            else TEXT_LIGHT
+        )
+
+        screen.blit(
+            label_text,
+            (GRID_WIDTH + 28, y)
+        )
+
+        screen.blit(
+            value_text,
+            (GRID_WIDTH + 165, y)
+        )
+
+        y += 27
+
+    # genome
+    draw_panel_section(
+        325,
+        190,
+        "Genome"
+    )
+
+    genes = [
+        ("Scent", chromosome["scent"]),
+        ("Explore", chromosome["exploration"]),
+        ("Obstacle", chromosome["obstacle"]),
+        ("Memory", chromosome["memory"])
+    ]
+
+    y = 370
+
+    for label, value in genes:
+
+        label_text = body_font.render(
+            f"{label}:",
+            True,
+            TEXT_MUTED
+        )
+
+        value_text = body_font.render(
+            f"{value:.4f}",
+            True,
+            TEXT_LIGHT
+        )
+
+        screen.blit(
+            label_text,
+            (GRID_WIDTH + 28, y)
+        )
+
+        screen.blit(
+            value_text,
+            (GRID_WIDTH + 165, y)
+        )
+
+        y += 31
+
+    # bottom hint
+    hint = hint_font.render(
+        "ESC  -  controls",
+        True,
+        TEXT_MUTED
+    )
+
+    hint_rect = hint.get_rect(
+        center=(
+            GRID_WIDTH + PANEL_WIDTH // 2,
+            HEIGHT - 28
+        )
+    )
+
+    screen.blit(
+        hint,
+        hint_rect
+    )
+
+    # result overlay
+    if rescued:
 
         message = big_font.render(
             "Rescue complete!",
             True,
-            TEXT_COLOR
+            SUCCESS_COLOR
         )
 
         message_rect = message.get_rect(
-            center=(WIDTH // 2, 45)
+            center=(
+                GRID_WIDTH // 2,
+                34
+            )
         )
 
         screen.blit(
@@ -1349,24 +1811,196 @@ def draw_text():
 
     elif run_finished:
 
-        big_font = pygame.font.SysFont(
-            None,
-            48
-        )
-
         message = big_font.render(
             "Search failed",
             True,
-            TEXT_COLOR
+            ACCENT_RED
         )
 
         message_rect = message.get_rect(
-            center=(WIDTH // 2, 45)
+            center=(
+                GRID_WIDTH // 2,
+                34
+            )
         )
 
         screen.blit(
             message,
             message_rect
+        )
+
+def draw_controls_overlay():
+
+    if not show_controls:
+        return
+
+    overlay = pygame.Surface(
+        (GRID_WIDTH, GRID_HEIGHT),
+        pygame.SRCALPHA
+    )
+
+    overlay.fill(
+        (18, 25, 35, 185)
+    )
+
+    screen.blit(
+        overlay,
+        (0, 0)
+    )
+
+    box_width = 390
+    box_height = 500
+
+    box_x = (
+        GRID_WIDTH // 2
+        - box_width // 2
+    )
+
+    box_y = (
+        GRID_HEIGHT // 2
+        - box_height // 2
+    )
+
+    box = pygame.Rect(
+        box_x,
+        box_y,
+        box_width,
+        box_height
+    )
+
+    pygame.draw.rect(
+        screen,
+        PANEL_COLOR,
+        box,
+        border_radius=16
+    )
+
+    pygame.draw.rect(
+        screen,
+        PANEL_SECTION_COLOR,
+        box,
+        2,
+        border_radius=16
+    )
+
+    title_font = pygame.font.SysFont(
+        None,
+        38
+    )
+
+    body_font = pygame.font.SysFont(
+        None,
+        26
+    )
+
+    muted_font = pygame.font.SysFont(
+        None,
+        22
+    )
+
+    title = title_font.render(
+        "Controls",
+        True,
+        TEXT_LIGHT
+    )
+
+    screen.blit(
+        title,
+        (
+            box_x + 28,
+            box_y + 25
+        )
+    )
+
+    controls = [
+        ("A", "Start / stop automatic search"),
+        ("SPACE", "Take one search step"),
+        ("H", "Toggle scent visualization"),
+        ("T", "Toggle grid"),
+        ("E", "Evaluate current chromosome"),
+        ("P", "Test initial population"),
+        ("G", "Run genetic algorithm"),
+        ("R", "Reset simulation"),
+        ("F11", "Toggle fullscreen")
+    ]
+
+    y = box_y + 85
+
+    for key, description in controls:
+
+        key_text = body_font.render(
+            key,
+            True,
+            ACCENT_CYAN
+        )
+
+        description_text = body_font.render(
+            description,
+            True,
+            TEXT_LIGHT
+        )
+
+        screen.blit(
+            key_text,
+            (
+                box_x + 30,
+                y
+            )
+        )
+
+        screen.blit(
+            description_text,
+            (
+                box_x + 115,
+                y
+            )
+        )
+
+        y += 38
+
+    close_text = muted_font.render(
+        "Press ESC to return",
+        True,
+        TEXT_MUTED
+    )
+
+    close_rect = close_text.get_rect(
+        center=(
+            box_x + box_width // 2,
+            box_y + box_height - 28
+        )
+    )
+
+    screen.blit(
+        close_text,
+        close_rect
+    )
+
+def toggle_fullscreen():
+
+    global display
+    global fullscreen
+    global windowed_size
+
+    fullscreen = not fullscreen
+
+    if fullscreen:
+
+        windowed_size = (
+            display.get_width(),
+            display.get_height()
+        )
+
+        display = pygame.display.set_mode(
+            (0, 0),
+            pygame.FULLSCREEN
+        )
+
+    else:
+
+        display = pygame.display.set_mode(
+            windowed_size,
+            pygame.RESIZABLE
         )
 
 # main loop
@@ -1384,7 +2018,18 @@ while running:
 
         if event.type == pygame.KEYDOWN:
 
-            if event.key == pygame.K_r:
+            if event.key == pygame.K_ESCAPE:
+                show_controls = not show_controls
+                if show_controls:
+                    auto_mode = False
+            
+            elif event.key == pygame.K_F11:
+                toggle_fullscreen()    
+
+            elif show_controls:
+                continue  # ignore other keys while controls overlay is shown
+  
+            elif event.key == pygame.K_r:
                 reset_simulation()
 
             elif event.key == pygame.K_h:
@@ -1460,7 +2105,7 @@ while running:
                 save_evolution_history(
                     evolution_history
                 )
-                
+
                 save_evolution_graphs(
                     evolution_history
                 )
@@ -1494,6 +2139,9 @@ while running:
                 if not run_finished:
                     auto_mode = not auto_mode
 
+            elif event.key == pygame.K_t:
+                show_grid = not show_grid
+
             elif not run_finished:
 
                 if event.key == pygame.K_SPACE:
@@ -1510,6 +2158,19 @@ while running:
 
                 elif event.key == pygame.K_RIGHT:
                     move_dog(1, 0)
+
+        if event.type == pygame.VIDEORESIZE:
+            if not fullscreen:
+
+                windowed_size = (
+                    event.w,
+                    event.h
+                )
+
+                display = pygame.display.set_mode(
+                    windowed_size,
+                    pygame.RESIZABLE
+                )
 
     # automatic movement
     if (
@@ -1532,17 +2193,21 @@ while running:
         auto_mode = False
 
     # drawing
-    screen.fill(BACKGROUND)
+    screen.fill(BACKGROUND, WORLD_RECT)
+    screen.fill(PANEL_COLOR, PANEL_RECT)
 
     draw_grid()
-
     draw_scent_field()
+    draw_pawprints()
 
     draw_obstacles()
     draw_victim()
     draw_dog()
 
+    draw_panel()
     draw_text()
+
+    draw_controls_overlay()
 
     pygame.display.flip()
 
