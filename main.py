@@ -211,17 +211,17 @@ def record_visit(position):
 
     trail_positions.append(key)
 
-def manhattan_distance():
+def chebyshev_distance():
 
-    return (
-        abs(dog_pos[0] - victim_pos[0])
-        + abs(dog_pos[1] - victim_pos[1])
-    )
+    dx = abs(dog_pos[0] - victim_pos[0])
+    dy = abs(dog_pos[1] - victim_pos[1])
+
+    return max(dx, dy)
 
 
 def calculate_cost():
 
-    distance = manhattan_distance()
+    distance = chebyshev_distance()
 
     failure_penalty = 0
 
@@ -240,14 +240,10 @@ def calculate_cost():
 # scent
 
 def scent_strength(x, y):
-    """
-    returns a local scent value between 0 and 1
-
-    doggy does NOT receive the victim's coordinates
-    it only receives this scalar scent measurement
-    """
-
-    distance = abs(x - victim_pos[0]) + abs(y - victim_pos[1])
+    distance = max(
+        abs(x - victim_pos[0]),
+        abs(y - victim_pos[1])
+    )
 
     if distance > SCENT_RADIUS:
         return 0.0
@@ -269,17 +265,18 @@ def memory_penalty(x, y):
 
     return visit_count.get((x, y), 0)
 
-
 def obstacle_penalty(x, y):
-    """
-    blocked cells immediately surrounding
-    the candidate position
-    """
+
     neighbors = [
         (x + 1, y),
         (x - 1, y),
         (x, y + 1),
-        (x, y - 1)
+        (x, y - 1),
+
+        (x + 1, y + 1),
+        (x + 1, y - 1),
+        (x - 1, y + 1),
+        (x - 1, y - 1)
     ]
 
     blocked = 0
@@ -289,8 +286,33 @@ def obstacle_penalty(x, y):
         if not valid_position(nx, ny):
             blocked += 1
 
-    return blocked / 4
+    return blocked / 8
 
+def valid_move(current_x, current_y, new_x, new_y):
+
+    if not valid_position(new_x, new_y):
+        return False
+
+    dx = new_x - current_x
+    dy = new_y - current_y
+
+    # diagonal movement
+    if abs(dx) == 1 and abs(dy) == 1:
+
+        horizontal_clear = valid_position(
+            current_x + dx,
+            current_y
+        )
+
+        vertical_clear = valid_position(
+            current_x,
+            current_y + dy
+        )
+
+        if not horizontal_clear or not vertical_clear:
+            return False
+
+    return True
 
 # doggy decision-making
 
@@ -328,17 +350,22 @@ def autonomous_step():
     x, y = dog_pos
 
     candidates = [
-        (x, y - 1),  # UP
-        (x, y + 1),  # DOWN
-        (x - 1, y),  # LEFT
-        (x + 1, y)   # RIGHT
+        (x, y - 1),      # up
+        (x, y + 1),      # down
+        (x - 1, y),      # left
+        (x + 1, y),      # right
+
+        (x - 1, y - 1),  # up-left
+        (x + 1, y - 1),  # up-right
+        (x - 1, y + 1),  # down-left
+        (x + 1, y + 1)   # down-right
     ]
 
     valid_candidates = []
 
     for nx, ny in candidates:
 
-        if valid_position(nx, ny):
+        if valid_move(x, y, nx, ny):
 
             score = evaluate_cell(nx, ny)
 
@@ -1693,7 +1720,7 @@ def draw_text():
         ("Status", status_text),
         ("Steps", str(step_count)),
         ("Repeated", str(repeated_visits)),
-        ("Distance", str(manhattan_distance())),
+        ("Distance", str(chebyshev_distance())),
         ("Cost", f"{calculate_cost():.1f}")
     ]
 
