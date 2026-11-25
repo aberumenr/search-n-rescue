@@ -139,6 +139,54 @@ obstacles = {
     (3, 14), (4, 14), (5, 14), (6, 14)
 }
 
+# rescue scenarios
+SCENARIOS = {
+    1: {
+        "name": "Base Camp",
+        "victim": tuple(victim_pos),
+        "obstacles": set(obstacles)
+    },
+
+    2: {
+        "name": "Mountain Pass",
+        "victim": (21, 12),
+        "obstacles": {
+            # first ridge
+            *[(7, y) for y in range(0, 6)],
+            *[(7, y) for y in range(9, 16)],
+
+            # second ridge
+            *[(15, y) for y in range(0, 4)],
+            *[(15, y) for y in range(7, 13)],
+
+            # scattered rocks
+            (4, 8), (5, 8),
+            (10, 2), (11, 2),
+            (10, 12), (11, 12),
+            (19, 5), (20, 5),
+            (19, 9), (20, 9)
+        }
+    },
+
+    3: {
+        "name": "Frozen Forest",
+        "victim": (20, 4),
+        "obstacles": {
+            (3, 4), (3, 5), (4, 4),
+            (6, 9), (6, 10), (7, 10),
+            (9, 3), (10, 3), (10, 4),
+            (12, 7), (12, 8), (13, 8),
+            (16, 2), (16, 3), (17, 3),
+            (18, 11), (19, 11), (19, 12),
+            (5, 13), (6, 13),
+            (14, 12), (14, 13),
+            (21, 8), (21, 9)
+        }
+    }
+}
+
+current_scenario = 1
+
 # manual chromosome
 
 chromosome = {
@@ -463,6 +511,32 @@ def reset_simulation():
     run_finished = False
 
     record_visit(dog_pos)
+
+
+def load_scenario(scenario_id):
+    global current_scenario
+    global victim_pos
+    global obstacles
+    global dog_facing_right
+
+    if scenario_id not in SCENARIOS:
+        return
+
+    scenario = SCENARIOS[scenario_id]
+
+    current_scenario = scenario_id
+    victim_pos = list(scenario["victim"])
+    obstacles = set(scenario["obstacles"])
+
+    reset_simulation()
+    dog_facing_right = True
+
+    print()
+    print("=" * 50)
+    print(f"SCENARIO {scenario_id}: {scenario['name']}")
+    print("=" * 50)
+    print(f"Victim: {victim_pos}")
+    print(f"Obstacles: {len(obstacles)}")
 
 # fast simulation
 
@@ -1677,6 +1751,19 @@ def draw_text():
         TEXT_MUTED
     )
 
+    scenario_name = SCENARIOS[current_scenario]["name"]
+
+    scenario_text = subtitle_font.render(
+        f"Scenario {current_scenario}: {scenario_name}",
+        True,
+        TEXT_MUTED
+    )
+
+    screen.blit(
+        scenario_text,
+        (GRID_WIDTH + 24, 105)
+    )
+
     screen.blit(
         title,
         (GRID_WIDTH + 24, 18)
@@ -1948,7 +2035,8 @@ def draw_controls_overlay():
         ("P", "Test initial population"),
         ("G", "Run genetic algorithm"),
         ("R", "Reset simulation"),
-        ("F11", "Toggle fullscreen")
+        ("F11", "Toggle fullscreen"),
+        ("1 / 2 / 3", "Select rescue scenario")
     ]
 
     y = box_y + 85
@@ -2161,11 +2249,17 @@ while running:
                 print(
                     "Press A to watch it search!"
                 )
-
             elif event.key == pygame.K_a:
                 if not run_finished:
                     auto_mode = not auto_mode
+            elif event.key == pygame.K_1:
+                load_scenario(1)
 
+            elif event.key == pygame.K_2:
+                load_scenario(2)
+
+            elif event.key == pygame.K_3:
+                load_scenario(3)
             elif event.key == pygame.K_t:
                 show_grid = not show_grid
 
