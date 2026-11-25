@@ -36,6 +36,12 @@ FINAL_VALIDATION_RUNS = 30
 
 GENERATIONS = 30
 
+# multi-map training
+TRAINING_SCENARIOS = (1, 2)
+VALIDATION_SCENARIOS = (3,)
+
+RUNS_PER_SCENARIO = 5
+
 sarge_image = pygame.image.load("sargeant.png").convert_alpha()
 victim_image = pygame.image.load("victim.png").convert_alpha()
 
@@ -273,7 +279,7 @@ def calculate_cost():
 
     failure_penalty = 0
 
-    if not rescued:
+    if run_finished and not rescued:
         failure_penalty = FAILURE_PENALTY
 
     cost = (
@@ -540,49 +546,95 @@ def load_scenario(scenario_id):
 
 # fast simulation
 
-def simulate_chromosome(test_chromosome):
+
+# fast simulation
+def simulate_chromosome(test_chromosome, scenario_id=1):
+
+    scenario = SCENARIOS[scenario_id]
+    sim_obstacles = scenario["obstacles"]
+    sim_victim = scenario["victim"]
 
     sim_pos = START_POSITION.copy()
-
-    sim_visits = {
-        tuple(sim_pos): 1
-    }
+    sim_visits = {tuple(sim_pos): 1}
 
     sim_steps = 0
     sim_repeated = 0
-    sim_rescued = False
+    sim_rescued = tuple(sim_pos) == sim_victim
+
+    directions = [
+        (0, -1), (0, 1),
+        (-1, 0), (1, 0),
+        (-1, -1), (1, -1),
+        (-1, 1), (1, 1)
+    ]
+
+    def valid_cell(x, y):
+        return (
+            0 <= x < GRID_COLS
+            and 0 <= y < GRID_ROWS
+            and (x, y) not in sim_obstacles
+        )
+
+    def valid_step(x, y, nx, ny):
+        if not valid_cell(nx, ny):
+            return False
+
+        dx = nx - x
+        dy = ny - y
+
+        if abs(dx) == 1 and abs(dy) == 1:
+            if not valid_cell(x + dx, y):
+                return False
+
+            if not valid_cell(x, y + dy):
+                return False
+
+        return True
+
+    def distance_to_victim(x, y):
+        return max(
+            abs(x - sim_victim[0]),
+            abs(y - sim_victim[1])
+        )
+
+    def local_scent(x, y):
+        distance = distance_to_victim(x, y)
+
+        if distance > SCENT_RADIUS:
+            return 0.0
+
+        return 1.0 - distance / SCENT_RADIUS
+
+    def local_obstacle_penalty(x, y):
+        blocked = 0
+
+        for dx, dy in directions:
+            if not valid_cell(x + dx, y + dy):
+                blocked += 1
+
+        return blocked / 8
 
     while sim_steps < MAX_STEPS and not sim_rescued:
 
         x, y = sim_pos
+        candidates = []
 
-        candidates = [
-            (x, y - 1),
-            (x, y + 1),
-            (x - 1, y),
-            (x + 1, y)
-        ]
+        for dx, dy in directions:
 
-        valid_candidates = []
+            nx = x + dx
+            ny = y + dy
 
-        for nx, ny in candidates:
-
-            if not valid_position(nx, ny):
+            if not valid_step(x, y, nx, ny):
                 continue
 
-            # scent
-            scent = scent_strength(nx, ny)
+            scent = local_scent(nx, ny)
 
-            # exploration
-            if (nx, ny) not in sim_visits:
-                exploration = 1.0
-            else:
-                exploration = 0.0
+            exploration = (
+                1.0 if (nx, ny) not in sim_visits
+                else 0.0
+            )
 
-            # obstacle avoidance
-            obstacle = obstacle_penalty(nx, ny)
-
-            # memory
+            obstacle = local_obstacle_penalty(nx, ny)
             memory = sim_visits.get((nx, ny), 0)
 
             score = (
@@ -594,22 +646,17 @@ def simulate_chromosome(test_chromosome):
 
             score += random.uniform(-0.01, 0.01)
 
-            valid_candidates.append(
-                (score, nx, ny)
-            )
+            candidates.append((score, nx, ny))
 
-        if not valid_candidates:
+        if not candidates:
             break
 
-        valid_candidates.sort(
-            key=lambda item: item[0],
-            reverse=True
+        _, best_x, best_y = max(
+            candidates,
+            key=lambda item: item[0]
         )
 
-        _, best_x, best_y = valid_candidates[0]
-
         sim_pos = [best_x, best_y]
-
         sim_steps += 1
 
         key = tuple(sim_pos)
@@ -619,18 +666,14 @@ def simulate_chromosome(test_chromosome):
 
         sim_visits[key] = sim_visits.get(key, 0) + 1
 
-        if sim_pos == victim_pos:
+        if key == sim_victim:
             sim_rescued = True
 
-    distance = (
-        abs(sim_pos[0] - victim_pos[0])
-        + abs(sim_pos[1] - victim_pos[1])
+    distance = distance_to_victim(*sim_pos)
+
+    failure_penalty = (
+        0 if sim_rescued else FAILURE_PENALTY
     )
-
-    failure_penalty = 0
-
-    if not sim_rescued:
-        failure_penalty = FAILURE_PENALTY
 
     cost = (
         sim_steps
@@ -644,20 +687,43 @@ def simulate_chromosome(test_chromosome):
         "steps": sim_steps,
         "repeated": sim_repeated,
         "distance": distance,
-        "cost": cost
+        "cost": cost,
+        "scenario": scenario_id
     }
 
-def evaluate_chromosome(test_chromosome, runs=3):
+
+def evaluate_chromosome(
+    test_chromosome,
+    runs=RUNS_PER_SCENARIO,
+    scenario_ids=None
+):
+
+    if scenario_ids is None:
+        scenario_ids = TRAINING_SCENARIOS
 
     results = []
+    scenario_costs = []
 
-    for _ in range(runs):
-        result = simulate_chromosome(test_chromosome)
-        results.append(result)
+    for scenario_id in scenario_ids:
 
-    average_cost = sum(
-        result["cost"] for result in results
-    ) / runs
+        costs = []
+
+        for _ in range(runs):
+
+            result = simulate_chromosome(
+                test_chromosome,
+                scenario_id=scenario_id
+            )
+
+            results.append(result)
+            costs.append(result["cost"])
+
+        scenario_average = sum(costs) / len(costs)
+        scenario_costs.append(scenario_average)
+
+    average_cost = (
+        sum(scenario_costs) / len(scenario_costs)
+    )
 
     return average_cost, results
 
@@ -733,7 +799,7 @@ def print_population_results(evaluated_population):
             f"{rank:02}. "
             f"Dog {individual['id']:02} | "
             f"Cost: {individual['average_cost']:.2f} | "
-            f"Rescues: {individual['successful_runs']}/{EVALUATION_RUNS} | "
+            f"Rescues: {individual['successful_runs']}/{len(individual['results'])} | "
             f"Scent: {genes['scent']:.2f} | "
             f"Explore: {genes['exploration']:.2f} | "
             f"Obstacle: {genes['obstacle']:.2f} | "
@@ -808,7 +874,7 @@ def print_survivors(survivors):
             f"{rank:02}. "
             f"Dog {individual['id']:02} | "
             f"Cost: {individual['average_cost']:.2f} | "
-            f"Rescues: {individual['successful_runs']}/{EVALUATION_RUNS} | "
+            f"Rescues: {individual['successful_runs']}/{len(individual['results'])} | "
             f"Scent: {genes['scent']:.2f} | "
             f"Explore: {genes['exploration']:.2f} | "
             f"Obstacle: {genes['obstacle']:.2f} | "
@@ -985,11 +1051,12 @@ def population_average_cost(evaluated_population):
     return total / len(evaluated_population)
 
 
+
 def population_rescue_rate(evaluated_population):
 
-    total_runs = (
-        len(evaluated_population)
-        * EVALUATION_RUNS
+    total_runs = sum(
+        len(individual["results"])
+        for individual in evaluated_population
     )
 
     successful_runs = sum(
@@ -998,7 +1065,6 @@ def population_rescue_rate(evaluated_population):
     )
 
     return successful_runs / total_runs
-
 
 def run_evolution(generations=GENERATIONS):
 
@@ -1133,7 +1199,8 @@ def validate_best_chromosome(
 
     average_cost, results = evaluate_chromosome(
         best_chromosome,
-        runs=runs
+        runs=runs,
+        scenario_ids=VALIDATION_SCENARIOS
     )
 
     successful_runs = sum(
@@ -1259,6 +1326,10 @@ def save_best_result(
             f"Average repeated visits: "
             f"{validation['average_repeated']:.2f}\n"
         )
+
+        file.write(f"Training scenarios: {TRAINING_SCENARIOS}\n")
+
+        file.write(f"Validation scenarios: {VALIDATION_SCENARIOS}\n")
 
     print(
         f"Best result saved to {filename}"
@@ -1761,7 +1832,7 @@ def draw_text():
 
     screen.blit(
         scenario_text,
-        (GRID_WIDTH + 24, 105)
+        (GRID_WIDTH + 24, 80)
     )
 
     screen.blit(
@@ -1776,8 +1847,8 @@ def draw_text():
 
     # run status
     draw_panel_section(
-        95,
-        205,
+        120,
+        230,
         "Run Status"
     )
 
@@ -1811,7 +1882,7 @@ def draw_text():
         ("Cost", f"{calculate_cost():.1f}")
     ]
 
-    y = 138
+    y = 165
 
     for label, value in lines:
 
@@ -1843,8 +1914,8 @@ def draw_text():
 
     # genome
     draw_panel_section(
-        325,
-        190,
+        375,
+        200,
         "Genome"
     )
 
@@ -1855,7 +1926,7 @@ def draw_text():
         ("Memory", chromosome["memory"])
     ]
 
-    y = 370
+    y = 420
 
     for label, value in genes:
 
@@ -2132,15 +2203,10 @@ while running:
             running = False
 
         if event.type == pygame.KEYDOWN:
-
             if event.key == pygame.K_ESCAPE:
                 show_controls = not show_controls
                 if show_controls:
                     auto_mode = False
-            
-            elif event.key == pygame.K_F11:
-                toggle_fullscreen()    
-
             elif show_controls:
                 continue  # ignore other keys while controls overlay is shown
   
@@ -2153,9 +2219,9 @@ while running:
             elif event.key == pygame.K_e:
                 average_cost, results = evaluate_chromosome(
                     chromosome,
-                    runs=3
+                    runs=5,
+                    scenario_ids=(current_scenario,)
                 )
-
                 print("\nChromosome evaluation")
 
                 print(chromosome)
