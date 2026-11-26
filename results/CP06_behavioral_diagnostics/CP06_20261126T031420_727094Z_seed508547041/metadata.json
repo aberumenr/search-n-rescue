@@ -1,0 +1,26 @@
+{
+  "version": "CP06_behavioral_diagnostic",
+  "created_utc": "20261126T031420_727094Z",
+  "diagnostic_seed": 508547041,
+  "paired_trials_per_map": 30,
+  "training_scenarios": [
+    1,
+    2
+  ],
+  "held_out_scenarios": [
+    3
+  ],
+  "baseline_chromosome": {
+    "scent": 0.9,
+    "exploration": 0.45,
+    "obstacle": 0.7,
+    "memory": 0.65
+  },
+  "champion_chromosome": {
+    "scent": 0.9105680462869048,
+    "exploration": 0.36984013210211764,
+    "obstacle": 0.5078799865896154,
+    "memory": 0.7467542643358712
+  },
+  "note": "Diagnostic never trains/selects a champion; paired seeds; paths compared at matching time indices."
+}

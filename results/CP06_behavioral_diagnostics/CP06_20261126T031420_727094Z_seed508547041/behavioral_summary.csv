@@ -1,0 +1,4 @@
+scenario_id,scenario_name,split,paired_trials,identical_paths,identical_path_rate,mean_aligned_position_agreement,mean_cost_difference,baseline_rescues,evolved_rescues
+1,Base Camp,training,30,30,1,1.0,0,30,30
+2,Mountain Pass,training,30,30,1,1.0,0,30,30
+3,Frozen Forest,unseen_validation,30,30,1,1.0,0,30,30

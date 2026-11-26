@@ -1,0 +1,22 @@
+BEST EVOLVED CHROMOSOME (INDEPENDENT TRAINING RE-EVALUATION)
+========================================
+Generation found: 9
+Re-evaluated training cost: 122.38
+
+Chromosome:
+scent: 0.910568
+exploration: 0.369840
+obstacle: 0.507880
+memory: 0.746754
+
+Training scenarios: (1, 2)
+Validation scenarios: (3,)
+
+FINAL VALIDATION
+========================================
+Runs: 30
+Successful rescues: 30
+Rescue rate: 100.0%
+Average cost: 63.97
+Average steps: 60.77
+Average repeated visits: 1.07
