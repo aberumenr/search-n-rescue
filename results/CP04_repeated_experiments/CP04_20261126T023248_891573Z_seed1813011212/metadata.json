@@ -1,0 +1,30 @@
+{
+  "seed": 1813011212,
+  "created_utc": "20261126T023248_891573Z",
+  "generations": 30,
+  "population_size": 16,
+  "training_scenarios": [
+    1,
+    2
+  ],
+  "validation_scenarios": [
+    3
+  ],
+  "runs_per_training_map": 5,
+  "comparison_runs_per_map": 30,
+  "final_validation_runs": 30,
+  "baseline_chromosome": {
+    "scent": 0.9,
+    "exploration": 0.45,
+    "obstacle": 0.7,
+    "memory": 0.65
+  },
+  "best_evolved_chromosome": {
+    "scent": 0.6815323224677395,
+    "exploration": 0.168515346852536,
+    "obstacle": 0.1405711238557596,
+    "memory": 0.8796907750213099
+  },
+  "best_observed_training_cost": 61.6,
+  "best_generation": 17
+}

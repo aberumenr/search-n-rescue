@@ -1,0 +1,22 @@
+BEST EVOLVED CHROMOSOME
+========================================
+Generation found: 8
+Training cost: 61.20
+
+Chromosome:
+scent: 0.695795
+exploration: 0.728141
+obstacle: 0.673337
+memory: 0.392554
+
+Training scenarios: (1, 2)
+Validation scenarios: (3,)
+
+FINAL VALIDATION
+========================================
+Runs: 30
+Successful rescues: 30
+Rescue rate: 100.0%
+Average cost: 70.37
+Average steps: 68.07
+Average repeated visits: 0.77
