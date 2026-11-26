@@ -1,0 +1,36 @@
+{
+  "version": "CP05_champion_reranking",
+  "seed": 2039676306,
+  "created_utc": "20261126T025819_116470Z",
+  "generations": 30,
+  "population_size": 16,
+  "training_scenarios": [
+    1,
+    2
+  ],
+  "validation_scenarios": [
+    3
+  ],
+  "runs_per_training_map": 5,
+  "candidate_pool_size": 5,
+  "rerank_runs_per_training_map": 30,
+  "comparison_runs_per_map": 30,
+  "final_validation_runs_per_map": 30,
+  "baseline_chromosome": {
+    "scent": 0.9,
+    "exploration": 0.45,
+    "obstacle": 0.7,
+    "memory": 0.65
+  },
+  "best_observed_training_cost": 58.3,
+  "best_observed_generation": 6,
+  "selected_training_rerank_cost": 112.68333333333334,
+  "selected_generation": 6,
+  "best_evolved_chromosome": {
+    "scent": 0.9306492161859716,
+    "exploration": 0.7856750201213699,
+    "obstacle": 0.5278359155482394,
+    "memory": 0.5447084904101911
+  },
+  "note": "Champion selected on maps 1 and 2 only. Map 3 withheld for final validation."
+}

@@ -1,0 +1,7 @@
+policy,scenario_id,scenario_name,split,runs,rescues,rescue_rate,mean_cost,std_cost,mean_steps,mean_revisits
+manual_baseline,1,Base Camp,train,30,29,0.9666666666666667,87.6,136.70194106030524,65.73333333333333,1.3333333333333333
+evolved,1,Base Camp,train,30,29,0.9666666666666667,87.6,136.70194106030524,65.73333333333333,1.3333333333333333
+manual_baseline,2,Mountain Pass,train,30,30,1.0,119.16666666666667,58.69975229539074,103.86666666666666,5.1
+evolved,2,Mountain Pass,train,30,30,1.0,119.16666666666667,58.69975229539074,103.86666666666666,5.1
+manual_baseline,3,Frozen Forest,unseen_validation,30,30,1.0,78.6,37.978759944165525,75,1.2
+evolved,3,Frozen Forest,unseen_validation,30,30,1.0,78.6,37.978759944165525,75,1.2
