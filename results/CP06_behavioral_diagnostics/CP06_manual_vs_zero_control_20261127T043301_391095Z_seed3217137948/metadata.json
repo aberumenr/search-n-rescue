@@ -1,0 +1,33 @@
+{
+  "version": "CP06_behavioral_diagnostic",
+  "comparison_name": "manual_vs_zero_control",
+  "created_utc": "20261127T043301_391095Z",
+  "diagnostic_seed": 3217137948,
+  "paired_trials_per_map": 30,
+  "training_scenarios": [
+    1,
+    2
+  ],
+  "held_out_scenarios": [
+    3
+  ],
+  "baseline_chromosome": {
+    "scent": 0.9,
+    "exploration": 0.45,
+    "obstacle": 0.7,
+    "memory": 0.65
+  },
+  "champion_chromosome": {
+    "scent": 0.0,
+    "exploration": 0.0,
+    "obstacle": 0.0,
+    "memory": 0.0
+  },
+  "comparison_policy": {
+    "scent": 0.0,
+    "exploration": 0.0,
+    "obstacle": 0.0,
+    "memory": 0.0
+  },
+  "note": "Diagnostic never trains/selects a champion; paired seeds; paths compared at matching time indices."
+}
